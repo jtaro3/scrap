@@ -1,0 +1,146 @@
+{
+  "version": "1.0.0",
+  "gameVersion": "0.1.1",
+  "sourceSha256": "77bc7d7aa50c8f632ea96b8c11c08b97f6fa4bf8f98c7d377ef4707906e3491b",
+  "tileImageSize": [
+    42,
+    42
+  ],
+  "tileTopSize": [
+    42,
+    21
+  ],
+  "runtimeUsesExportedPng": false,
+  "assets": [
+    {
+      "file": "tiles/grass.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        0
+      ],
+      "sha256": "f785e12bd56cb21d81b21246305673a5dd4de4f82f990f891f7320cb3faaae4b"
+    },
+    {
+      "file": "tiles/flowers.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        0
+      ],
+      "sha256": "149d712c7183c8c3ad6868077da21bd8f7c433cb7f0f054513e409b80d9e5749"
+    },
+    {
+      "file": "tiles/path.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        0
+      ],
+      "sha256": "77347c96cad76f7b46f87caf8513c8352425ac35b781fab7a6abaf2c9336f0a7"
+    },
+    {
+      "file": "tiles/water.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        0
+      ],
+      "sha256": "f243f839523b1c89adad428c9898a3a3cd8257c61b72f6450002f4e02223d08d"
+    },
+    {
+      "file": "tiles/bridge.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        0
+      ],
+      "sha256": "5251c5c69086b9116b1e664d51740771f8b6f62dea3e746edc675c8c0e2fd965"
+    },
+    {
+      "file": "objects/tree.png",
+      "width": 42,
+      "height": 84,
+      "anchor": [
+        21,
+        70
+      ],
+      "sha256": "3986246f7f8ef1a48a9312a99b8526f2e2e2a510e6e46bbbc52158ff1ac6fe9f"
+    },
+    {
+      "file": "objects/rock.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        28
+      ],
+      "sha256": "97d24deef906cd38056e10fe2fbcb47cb14359d77ac4742187b14042544e348f"
+    },
+    {
+      "file": "items/scrap.png",
+      "width": 42,
+      "height": 42,
+      "anchor": [
+        21,
+        28
+      ],
+      "sha256": "865c3945d135f06e2ae687312c0d95d7cff6b064715ad81a8b9f8f5f8686260d"
+    },
+    {
+      "file": "player/idle.png",
+      "width": 42,
+      "height": 63,
+      "anchor": [
+        21,
+        49
+      ],
+      "sha256": "a2aafd007e0137665da4fedd2b583cc4d4e1a62af586ccca1db711f62f680780"
+    },
+    {
+      "file": "player/walk-1.png",
+      "width": 42,
+      "height": 63,
+      "anchor": [
+        21,
+        49
+      ],
+      "sha256": "a2aafd007e0137665da4fedd2b583cc4d4e1a62af586ccca1db711f62f680780"
+    },
+    {
+      "file": "player/walk-2.png",
+      "width": 42,
+      "height": 63,
+      "anchor": [
+        21,
+        49
+      ],
+      "sha256": "c61f21d547e91b8d2d1fee3c8ad87eaf9de8956fb91a945c7ee2387aaff6c556"
+    },
+    {
+      "file": "player/walk-3.png",
+      "width": 42,
+      "height": 63,
+      "anchor": [
+        21,
+        49
+      ],
+      "sha256": "a2aafd007e0137665da4fedd2b583cc4d4e1a62af586ccca1db711f62f680780"
+    },
+    {
+      "file": "player/walk-4.png",
+      "width": 42,
+      "height": 63,
+      "anchor": [
+        21,
+        49
+      ],
+      "sha256": "ed2ff0086c575fd07e732ed310ad26a1f83eea09c0991064fcc23f20fe6c8c42"
+    }
+  ]
+}
