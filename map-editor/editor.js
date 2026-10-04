@@ -112,7 +112,7 @@
     status(label+'に切り替えました。'+(flatView?'地面・水・橋の高さを横から確認します（閲覧専用）。':'同じマップを編集できます。'));
   });
   function turn(step){rotation=(rotation+step+360)%360;$('rotationValue').textContent=rotation+'°';syncSize();setZoom(zoomIndex);draw();status(rotation+'度に回転しました。')}
-  $('rotateLeft').addEventListener('click',()=>turn(-45));$('rotateRight').addEventListener('click',()=>turn(45));
+  $('rotateLeft').addEventListener('click',()=>turn(-90));$('rotateRight').addEventListener('click',()=>turn(90));
   $('resetAngle').addEventListener('click',()=>turn(-rotation));
   function setTab(review){
     reviewMode=review;editing=false;placingPlayer=false;drag=null;
