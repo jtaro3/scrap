@@ -25,6 +25,15 @@
   function diamond(context,x,y,z=1){polygon(context,[project(x,y,z),project(x+1,y,z),project(x+1,y+1,z),project(x,y+1,z)])}
   function syncSize(){const b=bounds();canvas.width=Math.ceil(topView||flatView?map.width*42+padding*2:b.right-b.left+42+padding*2);canvas.height=Math.ceil(topView?map.height*42+padding*2:flatView?84+padding*2:b.bottom-b.top+42+padding*2);document.querySelector('.board-bar strong').textContent=`マップ ${map.width} × ${map.height}`;$('mapWidth').value=map.width;$('mapHeight').value=map.height;}
   syncSize();
+  function syncPanels(){
+    if(innerWidth<=760){document.querySelector('.preview-panel').style.height='';document.querySelector('.confirm-viewport').style.height='340px';return}
+    const board=document.querySelector('.board'),panel=document.querySelector('.preview-panel'),view=document.querySelector('.confirm-viewport');
+    panel.style.height=board.getBoundingClientRect().height+'px';
+    view.style.height=Math.max(160,panel.clientHeight-[...panel.children].filter(el=>el!==view).reduce((sum,el)=>sum+el.getBoundingClientRect().height,0))+'px';
+  }
+  new ResizeObserver(syncPanels).observe(document.querySelector('.board'));
+  $('panelRatio').addEventListener('input',()=>{const value=Number($('panelRatio').value);document.querySelector('main').style.setProperty('--edit-share',value+'fr');document.querySelector('main').style.setProperty('--confirm-share',(100-value)+'fr');$('ratioValue').textContent=value+'：'+(100-value);syncPanels()});
+  window.addEventListener('resize',syncPanels);
   const sheet=tools.tileFiles.map(()=>new Image());
   const buttons=[];
   const levels=[.4,.5,.75,1,1.25,1.5];
@@ -159,7 +168,7 @@
     canvas.style.touchAction=editing?'none':'pan-y';
   }
   function setTool(id){
-    selected=id;erasingTiles=false;erasingObjects=false;placingPlayer=false;updateToolUI();
+    selected=id;editing=true;erasingTiles=false;erasingObjects=false;placingPlayer=false;updateToolUI();
     status(`${tools.names[id]}を選択しました。${editing?'マップをタップして塗れます。':'塗るには「編集」を押してください。'}`);
   }
   function save(){
@@ -185,6 +194,10 @@
   function paint(event){
     if(reviewMode)return;
     const cell=cellAt(event);if(!cell)return;
+    if(erasingTiles){
+      for(const p of MapBrush.cells(cell.x,cell.y,brushLength,brushDirections[brushLength]||0,map.width,map.height,brushShape)){const i=p.y*map.width+p.x,before=map.layers[i].length;map.layers[i]=map.layers[i].filter(layer=>layer.z!==selectedHeight);if(before!==map.layers[i].length){updateColumn(i);changed=true}}
+      draw();status(selectedHeight+'階層のチップを削除しました。');return;
+    }
     if(placingPlayer){
       previewPlayer={x:cell.x*tools.tileSize+tools.tileSize/2,y:cell.y*tools.tileSize+tools.tileSize/2};drawOverlay();
       const blocked=MapCollision.blocked(previewPlayer.x,previewPlayer.y+14,10,MapCollision.build(map,tools.catalog));
@@ -209,8 +222,10 @@
     }
     for(const point of MapBrush.cells(cell.x,cell.y,brushLength,brushDirections[brushLength]||0,map.width,map.height,brushShape)){
       const index=point.y*map.width+point.x;
-      if(map.tiles[index]===selected&&map.heights[index]===selectedHeight)continue;
-      map.tiles[index]=selected;map.heights[index]=selectedHeight;changed=true;
+      const layer=map.layers[index].find(layer=>layer.z===selectedHeight);
+      if(layer?.id===selected)continue;
+      if(layer)layer.id=selected;else map.layers[index].push({id:selected,z:selectedHeight});
+      updateColumn(index);changed=true;
     }
     draw();
     status((brushShape==='square'?brushLength+'×'+brushLength:brushLength)+'マスで編集中');
