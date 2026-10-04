@@ -5,13 +5,18 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
-  function syncSize(){canvas.width=map.width*tools.tileSize;canvas.height=map.height*tools.tileSize;document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
+  const half=tools.tileSize/2, rise=tools.tileSize/4, padding=84;
+  const elevation=(x,y)=>tools.names[map.tiles[y*map.width+x]]==='water.png'?0:1;
+  function project(x,y,z=1){return {x:padding+map.height*half+(x-y)*half,y:padding+half+(x+y)*rise-z*half}}
+  function polygon(context,points){context.moveTo(points[0].x,points[0].y);for(const p of points.slice(1))context.lineTo(p.x,p.y);context.closePath()}
+  function diamond(context,x,y,z=1){polygon(context,[project(x,y,z),project(x+1,y,z),project(x+1,y+1,z),project(x,y+1,z)])}
+  function syncSize(){canvas.width=(map.width+map.height)*half+padding*2;canvas.height=Math.ceil((map.width+map.height)*rise+half+padding*2);document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
   syncSize();
   const sheet=tools.tileFiles.map(()=>new Image());
   const buttons=[];
   const levels=[.4,.5,.75,1,1.25,1.5];
   const availableWidth=innerWidth-32;
-  let zoomIndex=availableWidth>=tools.width*tools.tileSize?3:availableWidth>=tools.width*tools.tileSize*.75?2:availableWidth>=tools.width*tools.tileSize*.5?1:0;
+  let zoomIndex=availableWidth>=canvas.width?3:availableWidth>=canvas.width*.75?2:availableWidth>=canvas.width*.5?1:0;
   let selected=0,editing=false,erasingObjects=false,drag=null,changed=false,brushLength=1,brushShape='line';
   const brushDirections={3:0,5:0,7:0},brushButtons=[];
   const directionNames=['横','縦','右下がり斜め','右上がり斜め'];
@@ -37,41 +42,41 @@
     drawOverlay();
   }
   function drawCell(x,y){
-    const size=tools.tileSize,left=x*size,top=y*size;
-    ctx.fillStyle='#518046';ctx.fillRect(left,top,size,size);
-    tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],left,top);
-
+    const p=project(x,y,elevation(x,y));
+    tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],p.x-half,p.y);
   }
   function draw(){
-    ctx.imageSmoothingEnabled=false;
-    for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)drawCell(x,y);
-    for(const object of map.objects||[]){
-      const tile=tools.catalog[object.id],image=sheet[object.id];
-      if(image.complete&&image.naturalWidth)ctx.drawImage(image,object.x*tools.tileSize,object.y*tools.tileSize,(tile.width_tiles||1)*tools.tileSize,(tile.height_tiles||1)*tools.tileSize);
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;
+    for(let depth=0;depth<map.width+map.height-1;depth++)for(let y=Math.max(0,depth-map.width+1);y<=Math.min(map.height-1,depth);y++)drawCell(depth-y,y);
+    for(const object of [...(map.objects||[])].sort((a,b)=>(a.x+a.y)-(b.x+b.y))){
+      const image=sheet[object.id];if(!image.complete||!image.naturalWidth)continue;
+      const p=project(object.x+.5,object.y+.5,elevation(object.x,object.y));
+      // Sprite bases sit 14px above their lower edge; tall images grow upward.
+      ctx.drawImage(image,p.x-image.naturalWidth/2,p.y-image.naturalHeight+14);
     }
     drawOverlay();
   }
   function drawOverlay(){
-    const mapX=0,mapY=0,stageW=canvas.width,stageH=canvas.height;
-    const zoom=levels[zoomIndex];
-    const layer=canvas.parentElement;layer.style.width=stageW*zoom+'px';layer.style.height=stageH*zoom+'px';
-    canvas.style.position='absolute';canvas.style.left=mapX*zoom+'px';canvas.style.top=mapY*zoom+'px';
-    overlay.width=stageW;overlay.height=stageH;overlay.style.width=stageW*zoom+'px';overlay.style.height=stageH*zoom+'px';
+    const zoom=levels[zoomIndex],layer=canvas.parentElement;
+    layer.style.width=canvas.width*zoom+'px';layer.style.height=canvas.height*zoom+'px';
+    canvas.style.position='absolute';canvas.style.left='0';canvas.style.top='0';
+    overlay.width=canvas.width;overlay.height=canvas.height;overlay.style.width=canvas.width*zoom+'px';overlay.style.height=canvas.height*zoom+'px';
     if(showEditorGrid){
       overlayCtx.strokeStyle='#10211e88';overlayCtx.lineWidth=1;overlayCtx.beginPath();
-      for(let x=0;x<=map.width;x++){overlayCtx.moveTo(mapX+x*tools.tileSize+.5,mapY);overlayCtx.lineTo(mapX+x*tools.tileSize+.5,mapY+canvas.height)}
-      for(let y=0;y<=map.height;y++){overlayCtx.moveTo(mapX,mapY+y*tools.tileSize+.5);overlayCtx.lineTo(mapX+canvas.width,mapY+y*tools.tileSize+.5)}
+      for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)diamond(overlayCtx,x,y,elevation(x,y));
       overlayCtx.stroke();
     }
-    overlayCtx.strokeStyle='#b2d0bc';overlayCtx.lineWidth=2;
-    overlayCtx.strokeRect(mapX+1,mapY+1,canvas.width-2,canvas.height-2);
+    overlayCtx.strokeStyle='#b2d0bc';overlayCtx.lineWidth=2;overlayCtx.beginPath();
+    polygon(overlayCtx,[project(0,0),project(map.width,0),project(map.width,map.height),project(0,map.height)]);overlayCtx.stroke();
     if(placingPlayer||previewPlayer){
-      overlayCtx.strokeStyle='#ff7070';overlayCtx.lineWidth=2;
-      for(const rect of MapCollision.build(map,tools.catalog))overlayCtx.strokeRect(mapX+rect.left,mapY+rect.top,rect.right-rect.left,rect.bottom-rect.top);
+      overlayCtx.strokeStyle='#ff7070';overlayCtx.lineWidth=2;overlayCtx.beginPath();
+      for(const r of MapCollision.build(map,tools.catalog))polygon(overlayCtx,[project(r.left/42,r.top/42),project(r.right/42,r.top/42),project(r.right/42,r.bottom/42),project(r.left/42,r.bottom/42)]);
+      overlayCtx.stroke();
     }
     if(previewPlayer&&previewSprite){
-      const height=56*(window.ClockAttackPreviewScale||1),width=height*previewSprite.width/previewSprite.height;
-      overlayCtx.imageSmoothingEnabled=false;overlayCtx.drawImage(previewSprite,mapX+previewPlayer.x-width/2,mapY+previewPlayer.y+21-height,width,height);
+      const x=previewPlayer.x/tools.tileSize,y=previewPlayer.y/tools.tileSize,p=project(x,y,elevation(Math.floor(x),Math.floor(y)));
+      const scale=window.ClockAttackPreviewScale||1;
+      overlayCtx.imageSmoothingEnabled=false;overlayCtx.drawImage(previewSprite,p.x-21*scale,p.y-49*scale,42*scale,63*scale);
     }
   }
   $('editorGridToggle').addEventListener('click',()=>{showEditorGrid=!showEditorGrid;$('editorGridToggle').textContent='グリッド：'+(showEditorGrid?'ON':'OFF');$('editorGridToggle').setAttribute('aria-pressed',String(showEditorGrid));drawOverlay()});
@@ -110,10 +115,17 @@
   }
   function cellAt(event){
     const rect=canvas.getBoundingClientRect();
-    const x=Math.floor((event.clientX-rect.left)/rect.width*map.width);
-    const y=Math.floor((event.clientY-rect.top)/rect.height*map.height);
-    return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null;
+    const px=(event.clientX-rect.left)*canvas.width/rect.width,py=(event.clientY-rect.top)*canvas.height/rect.height;
+    const dx=(px-padding-map.height*half)/half;
+    // Check the raised surface first, then the lower water surface.
+    for(const z of [1,0]){
+      const dy=(py-padding-half+z*half)/rise;
+      const x=Math.floor((dy+dx)/2),y=Math.floor((dy-dx)/2);
+      if(x>=0&&x<map.width&&y>=0&&y<map.height&&elevation(x,y)===z)return {x,y};
+    }
+    return null;
   }
+
   function paint(event){
     const cell=cellAt(event);if(!cell)return;
     if(placingPlayer){
@@ -141,7 +153,7 @@
     for(const point of MapBrush.cells(cell.x,cell.y,brushLength,brushDirections[brushLength]||0,map.width,map.height,brushShape)){
       const index=point.y*map.width+point.x;
       if(map.tiles[index]===selected)continue;
-      map.tiles[index]=selected;changed=true;drawCell(point.x,point.y);
+      map.tiles[index]=selected;changed=true;
     }
     draw();
     status((brushShape==='square'?brushLength+'×'+brushLength:brushLength)+'マスで編集中');
