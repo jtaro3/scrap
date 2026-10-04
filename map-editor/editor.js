@@ -5,7 +5,7 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
-  let topView=false,flatView=false,rotation=0;
+  let topView=false,flatView=false,rotation=0,reviewMode=false;
   const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
   function bounds(){const p=[[0,0],[map.width,0],[map.width,map.height],[0,map.height]].map(([x,y])=>rotate(x,y));return {left:Math.min(...p.map(p=>(p.x-p.y)*21)),right:Math.max(...p.map(p=>(p.x-p.y)*21)),top:Math.min(...p.map(p=>(p.x+p.y)*10.5)),bottom:Math.max(...p.map(p=>(p.x+p.y)*10.5))}}
   const half=tools.tileSize/2, rise=tools.tileSize/4, padding=84;
@@ -104,13 +104,22 @@
   const viewModes=[['quarterView','クォータービュー'],['topView','真上'],['flatView','横']];
   for(const [id,label] of viewModes)$(id).addEventListener('click',()=>{
     topView=id==='topView';flatView=id==='flatView';drag=null;
-    $('rotateLeft').disabled=topView||flatView;$('rotateRight').disabled=topView||flatView;
+    $('rotateLeft').disabled=topView||flatView;$('rotateRight').disabled=topView||flatView;$('resetAngle').disabled=topView||flatView;
     for(const [buttonId] of viewModes){$(buttonId).setAttribute('aria-pressed',String(buttonId===id));$(buttonId).classList.toggle('selected',buttonId===id)}
     syncSize();setZoom(zoomIndex);draw();viewport.scrollLeft=0;viewport.scrollTop=0;
     status(label+'に切り替えました。'+(flatView?'地面・水・橋の高さを横から確認します（閲覧専用）。':'同じマップを編集できます。'));
   });
   function turn(step){rotation=(rotation+step+360)%360;$('rotationValue').textContent=rotation+'°';syncSize();setZoom(zoomIndex);draw();status(rotation+'度に回転しました。')}
   $('rotateLeft').addEventListener('click',()=>turn(-45));$('rotateRight').addEventListener('click',()=>turn(45));
+  $('resetAngle').addEventListener('click',()=>turn(-rotation));
+  function setTab(review){
+    reviewMode=review;editing=false;placingPlayer=false;drag=null;
+    for(const [id,active] of [['editingTab',!review],['reviewTab',review]]){$(id).setAttribute('aria-selected',String(active));$(id).classList.toggle('selected',active)}
+    $('brushes').hidden=review;$('edit').disabled=review;for(const id of ['resizeMap','mapWidth','mapHeight','clearMap','import'])$(id).disabled=review;for(const button of buttons)button.disabled=review;
+    $('quarterView').click();if(review)$('topView').click();
+    updateToolUI();status(review?'確認用です。視点を切り替えてマップを確認できます。':'編集用です。「編集」を押してマップを編集できます。');
+  }
+  $('editingTab').addEventListener('click',()=>setTab(false));$('reviewTab').addEventListener('click',()=>setTab(true));
   $('editorGridToggle').addEventListener('click',()=>{showEditorGrid=!showEditorGrid;$('editorGridToggle').textContent='グリッド：'+(showEditorGrid?'ON':'OFF');$('editorGridToggle').setAttribute('aria-pressed',String(showEditorGrid));drawOverlay()});
   function drawPalette(){
     for(let id=0;id<buttons.length;id++){
@@ -162,6 +171,7 @@
   }
 
   function paint(event){
+    if(reviewMode)return;
     const cell=cellAt(event);if(!cell)return;
     if(placingPlayer){
       previewPlayer={x:cell.x*tools.tileSize+tools.tileSize/2,y:cell.y*tools.tileSize+tools.tileSize/2};drawOverlay();
