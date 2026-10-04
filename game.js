@@ -12,8 +12,7 @@ poly(c,[[0,11],[21,0],[42,11],[21,22]],water?'#41b5b6':bridge?'#ac804b':path?'#b
 for(let i=0;i<26;i++){let x=(i*17+5)%40+1,y=(i*7)%21;if(Math.abs(x-21)/21+Math.abs(y-11)/11>.87)continue;c.fillStyle=water?(i%2?'#8bddcb':'#268f9c'):path?'#d3bd84':i%2?'#a2c660':'#608d42';c.fillRect(x,y,water?5:2,1)}
 if(bridge){for(let i=3;i<40;i+=6){c.strokeStyle='#654f36';c.beginPath();c.moveTo(i,11-i/2);c.lineTo(i,22-i/2);c.stroke()}poly(c,[[1,10],[21,0],[23,1],[3,12]],'#e2bd76');poly(c,[[20,20],[40,10],[42,11],[22,22]],'#e2bd76')}
 if(kind==='flowers'){for(const [x,y] of [[17,7],[26,12],[12,12]]){c.fillStyle='#e6e7a4';c.fillRect(x,y,2,2);c.fillStyle='#f8c0ab';c.fillRect(x+1,y-1,2,2)}}return a}
-const types=['grass','flowers','path','water','bridge'],names=['草地','花','道','水','橋'],chips=Object.fromEntries(types.map(t=>[t,chip(t)]));
-const atlas=document.createElement('canvas');atlas.width=42*types.length;atlas.height=42;types.forEach((t,i)=>{atlas.getContext('2d').drawImage(chips[t],42*i,0);const f=document.createElement('figure'),c=chips[t].cloneNode();c.getContext('2d').drawImage(chips[t],0,0);f.append(c,document.createTextNode(names[i]));document.querySelector('#tile-list').append(f)});document.querySelector('#download').href=atlas.toDataURL();
+const types=['grass','flowers','path','water','bridge'],chips=Object.fromEntries(types.map(t=>[t,chip(t)]));
 const map=Array.from({length:N},(_,y)=>Array.from({length:N},(_,x)=>{const river=x===9||x===10,bridge=river&&(y===9||y===10);return {x,y,type:bridge?'bridge':river?'water':(y===9||y===10)?'path':(x*7+y*11)%9===0?'flowers':'grass',z:river&&!bridge?0:1}}));
 const trees=[[2,3],[4,4],[6,2],[2,7],[4,13],[2,16],[7,16],[13,3],[16,4],[18,6],[14,14],[17,16],[12,17],[17,12]];
 const rocks=[[5,2],[3,15],[16,2],[18,14],[12,5]];
