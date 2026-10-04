@@ -5,13 +5,19 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
-  let topView=false,flatView=false;
+  let topView=false,flatView=false,rotation=0;
+  const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
+  function bounds(){const p=[[0,0],[map.width,0],[map.width,map.height],[0,map.height]].map(([x,y])=>rotate(x,y));return {left:Math.min(...p.map(p=>(p.x-p.y)*21)),right:Math.max(...p.map(p=>(p.x-p.y)*21)),top:Math.min(...p.map(p=>(p.x+p.y)*10.5)),bottom:Math.max(...p.map(p=>(p.x+p.y)*10.5))}}
   const half=tools.tileSize/2, rise=tools.tileSize/4, padding=84;
   const elevation=(x,y)=>tools.names[map.tiles[y*map.width+x]]==='water.png'?0:1;
-  function project(x,y,z=1){if(topView||flatView)return {x:padding+x*tools.tileSize,y:padding+y*tools.tileSize};return {x:padding+map.height*half+(x-y)*half,y:padding+half+(x+y)*rise-z*half}}
+  function project(x,y,z=1){
+    if(topView)return {x:padding+x*42,y:padding+y*42};
+    if(flatView)return {x:padding+x*42,y:padding+42-z*21};
+    const p=rotate(x,y),b=bounds();return {x:padding+21+(p.x-p.y)*21-b.left,y:padding+21+(p.x+p.y)*10.5-b.top-z*21};
+  }
   function polygon(context,points){context.moveTo(points[0].x,points[0].y);for(const p of points.slice(1))context.lineTo(p.x,p.y);context.closePath()}
   function diamond(context,x,y,z=1){polygon(context,[project(x,y,z),project(x+1,y,z),project(x+1,y+1,z),project(x,y+1,z)])}
-  function syncSize(){canvas.width=((topView||flatView)?map.width*tools.tileSize:(map.width+map.height)*half)+padding*2;canvas.height=(topView||flatView)?map.height*tools.tileSize+padding*2:Math.ceil((map.width+map.height)*rise+half+padding*2);document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
+  function syncSize(){const b=bounds();canvas.width=Math.ceil(topView||flatView?map.width*42+padding*2:b.right-b.left+42+padding*2);canvas.height=Math.ceil(topView?map.height*42+padding*2:flatView?84+padding*2:b.bottom-b.top+42+padding*2);document.querySelector('.board-bar strong').textContent=`マップ ${map.width} × ${map.height}`;$('mapWidth').value=map.width;$('mapHeight').value=map.height;}
   syncSize();
   const sheet=tools.tileFiles.map(()=>new Image());
   const buttons=[];
@@ -43,7 +49,7 @@
     drawOverlay();
   }
   function drawCell(x,y){
-    if(flatView){tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],padding+x*42,padding+y*42);return}
+    if(flatView){const p=project(x,y,elevation(x,y)),image=sheet[map.tiles[y*map.width+x]];ctx.fillStyle=elevation(x,y)?'#b78b53':'#258e96';ctx.fillRect(p.x,p.y,42,21);if(image.complete&&image.naturalWidth)ctx.drawImage(image,21,22,21,20,p.x,p.y,42,21);return}
     if(topView){
       const image=sheet[map.tiles[y*map.width+x]],left=padding+x*42,top=padding+y*42;
       if(!image.complete||!image.naturalWidth)return;
@@ -52,12 +58,18 @@
       ctx.transform(1,-1,2,2,left-21,top+21);ctx.drawImage(image,0,0);ctx.restore();return;
     }
     const p=project(x,y,elevation(x,y));
-    tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],p.x-half,p.y);
+    if(rotation===0){tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],p.x-half,p.y);return}
+    const image=sheet[map.tiles[y*map.width+x]];if(!image.complete||!image.naturalWidth)return;
+    const points=[project(x,y,elevation(x,y)),project(x+1,y,elevation(x,y)),project(x+1,y+1,elevation(x,y)),project(x,y+1,elevation(x,y))];
+    for(let i=0;i<4;i++){const a=points[i],b=points[(i+1)%4];ctx.beginPath();polygon(ctx,[a,b,{x:b.x,y:b.y+21},{x:a.x,y:a.y+21}]);ctx.fillStyle=elevation(x,y)?'#b78b53':'#258e96';ctx.fill()}
+    ctx.save();ctx.beginPath();polygon(ctx,points);ctx.clip();ctx.translate(p.x,p.y);const angle=rotation*Math.PI/180,c=Math.cos(angle),sn=Math.sin(angle);ctx.transform(c,sn/2,-sn*2,c,0,0);ctx.drawImage(image,-21,0);ctx.restore();
   }
   function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;
-    for(let depth=0;depth<map.width+map.height-1;depth++)for(let y=Math.max(0,depth-map.width+1);y<=Math.min(map.height-1,depth);y++)drawCell(depth-y,y);
-    for(const object of [...(map.objects||[])].sort((a,b)=>(a.x+a.y)-(b.x+b.y))){
+    const cells=map.tiles.map((_,i)=>({x:i%map.width,y:Math.floor(i/map.width)}));
+    cells.sort((a,b)=>{const p=rotate(a.x,a.y),q=rotate(b.x,b.y);return flatView?a.y-b.y:(p.x+p.y)-(q.x+q.y)});
+    for(const cell of cells)drawCell(cell.x,cell.y);
+    for(const object of [...(map.objects||[])].sort((a,b)=>project(a.x,a.y).y-project(b.x,b.y).y)){
       const image=sheet[object.id];if(!image.complete||!image.naturalWidth)continue;
       const p=project(object.x+.5,object.y+.5,elevation(object.x,object.y));
       // Sprite bases sit 14px above their lower edge; tall images grow upward.
@@ -89,13 +101,16 @@
       overlayCtx.imageSmoothingEnabled=false;overlayCtx.drawImage(previewSprite,p.x-21*scale,p.y-((topView||flatView)?31.5:49)*scale,42*scale,63*scale);
     }
   }
-  const viewModes=[['quarterView','クォータービュー'],['topView','真上'],['flatView','平面']];
+  const viewModes=[['quarterView','クォータービュー'],['topView','真上'],['flatView','横']];
   for(const [id,label] of viewModes)$(id).addEventListener('click',()=>{
     topView=id==='topView';flatView=id==='flatView';drag=null;
+    $('rotateLeft').disabled=topView||flatView;$('rotateRight').disabled=topView||flatView;
     for(const [buttonId] of viewModes){$(buttonId).setAttribute('aria-pressed',String(buttonId===id));$(buttonId).classList.toggle('selected',buttonId===id)}
     syncSize();setZoom(zoomIndex);draw();viewport.scrollLeft=0;viewport.scrollTop=0;
-    status(label+'に切り替えました。'+(flatView?'42×42pxのチップ画像全体を表示しています。':'同じマップを編集できます。'));
+    status(label+'に切り替えました。'+(flatView?'地面・水・橋の高さを横から確認します（閲覧専用）。':'同じマップを編集できます。'));
   });
+  function turn(step){rotation=(rotation+step+360)%360;$('rotationValue').textContent=rotation+'°';syncSize();setZoom(zoomIndex);draw();status(rotation+'度に回転しました。')}
+  $('rotateLeft').addEventListener('click',()=>turn(-45));$('rotateRight').addEventListener('click',()=>turn(45));
   $('editorGridToggle').addEventListener('click',()=>{showEditorGrid=!showEditorGrid;$('editorGridToggle').textContent='グリッド：'+(showEditorGrid?'ON':'OFF');$('editorGridToggle').setAttribute('aria-pressed',String(showEditorGrid));drawOverlay()});
   function drawPalette(){
     for(let id=0;id<buttons.length;id++){
@@ -133,12 +148,14 @@
   function cellAt(event){
     const rect=canvas.getBoundingClientRect();
     const px=(event.clientX-rect.left)*canvas.width/rect.width,py=(event.clientY-rect.top)*canvas.height/rect.height;
-    if(topView||flatView){const x=Math.floor((px-padding)/tools.tileSize),y=Math.floor((py-padding)/tools.tileSize);return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null}
-    const dx=(px-padding-map.height*half)/half;
+    if(flatView)return null;
+    if(topView){const x=Math.floor((px-padding)/tools.tileSize),y=Math.floor((py-padding)/tools.tileSize);return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null}
+    const b=bounds(),dx=(px-padding-21+b.left)/half;
     // Check the raised surface first, then the lower water surface.
     for(const z of [1,0]){
-      const dy=(py-padding-half+z*half)/rise;
-      const x=Math.floor((dy+dx)/2),y=Math.floor((dy-dx)/2);
+      const dy=(py-padding-21+b.top+z*half)/rise;
+      const rx=(dy+dx)/2,ry=(dy-dx)/2,a=rotation*Math.PI/180;
+      const x=Math.floor(rx*Math.cos(a)+ry*Math.sin(a)+map.width/2),y=Math.floor(-rx*Math.sin(a)+ry*Math.cos(a)+map.height/2);
       if(x>=0&&x<map.width&&y>=0&&y<map.height&&elevation(x,y)===z)return {x,y};
     }
     return null;

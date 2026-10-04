@@ -17,13 +17,13 @@
   .view-options button.selected{background:#6b7446;border-color:#f5d58b;box-shadow:0 0 0 1px #f5d58b55}</style>
 </head>
 <body>
-  <header><h1>Scrap マップ編集 · v0.2.3</h1></header>
+  <header><h1>Scrap マップ編集 · v0.2.4</h1></header>
   <div id="brushes" class="brushes" role="toolbar" aria-label="描画ツール"></div>
   <main>
     <section class="board" aria-label="マップ編集盤面">
       <div class="board-bar"><strong>マップ 24 × 18</strong><div class="zoom"><button id="pan" class="small-button pan-button" type="button" aria-pressed="true">移動</button><button id="edit" class="small-button edit-button" type="button" aria-pressed="false">編集</button><button id="zoomOut" class="small-button" type="button" aria-label="縮小">−</button><span id="zoomValue">100%</span><button id="zoomIn" class="small-button" type="button" aria-label="拡大">＋</button></div></div>
       <div class="view-options"><label>マップ 横<input id="mapWidth" type="number" min="4" max="256" value="64">マス</label><label>縦<input id="mapHeight" type="number" min="4" max="256" value="64">マス</label><button id="resizeMap" type="button">サイズ変更</button></div>
-      <div class="view-options"><button id="quarterView" class="selected" type="button" aria-pressed="true">クォータービュー</button><button id="topView" type="button" aria-pressed="false">真上</button><button id="flatView" type="button" aria-pressed="false">平面</button><button id="editorGridToggle" type="button" aria-pressed="true">グリッド：ON</button></div>
+      <div class="view-options"><button id="quarterView" class="selected" type="button" aria-pressed="true">クォータービュー</button><button id="topView" type="button" aria-pressed="false">真上</button><button id="flatView" type="button" aria-pressed="false">横</button><button id="rotateLeft" type="button">左へ45°</button><span id="rotationValue">0°</span><button id="rotateRight" type="button">右へ45°</button><button id="editorGridToggle" type="button" aria-pressed="true">グリッド：ON</button></div>
       <div id="viewport" class="viewport"><div class="map-layer"><canvas id="map" width="768" height="576" aria-label="マップ"></canvas><canvas id="mapOverlay" width="768" height="576" aria-hidden="true"></canvas></div></div>
       <div class="board-footer"><span id="message" role="status">読み込み中</span></div>
     </section>
@@ -45,7 +45,7 @@
   <script src="map-collision.js"></script>
   <script src="player-preview.js"></script>
   <script src="brush.js?objects=1"></script>
-  <script src="editor.js?v=0.2.3"></script>
+  <script src="editor.js?v=0.2.4"></script>
 </body>
 </html>
 
