@@ -9,8 +9,10 @@
   let topView=false,flatView=false,rotation=0,reviewMode=false;
   const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
   function bounds(){const p=[[0,0],[map.width,0],[map.width,map.height],[0,map.height]].map(([x,y])=>rotate(x,y));return {left:Math.min(...p.map(p=>(p.x-p.y)*21)),right:Math.max(...p.map(p=>(p.x-p.y)*21)),top:Math.min(...p.map(p=>(p.x+p.y)*10.5)),bottom:Math.max(...p.map(p=>(p.x+p.y)*10.5))}}
-  const half=tools.tileSize/2, rise=tools.tileSize/4, padding=84;
-  const elevation=(x,y)=>tools.names[map.tiles[y*map.width+x]]==='water.png'?0:1;
+  const half=tools.tileSize/2, rise=tools.tileSize/4, padding=147;
+  const elevation=(x,y)=>1+(map.heights?.[y*map.width+x]||0);
+  let selectedHeight=0,flashUntil=0;
+  let heightButtons=[];
   function project(x,y,z=1){
     if(topView)return {x:padding+x*42,y:padding+y*42};
     if(flatView)return {x:padding+x*42,y:padding+42-z*21};
@@ -97,6 +99,7 @@
       for(const r of MapCollision.build(map,tools.catalog))polygon(overlayCtx,[project(r.left/42,r.top/42),project(r.right/42,r.top/42),project(r.right/42,r.bottom/42),project(r.left/42,r.bottom/42)]);
       overlayCtx.stroke();
     }
+    if(performance.now()<flashUntil&&Math.floor(performance.now()/250)%2===0){overlayCtx.fillStyle='#ffe36b99';for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)if(map.heights[y*map.width+x]===selectedHeight){overlayCtx.beginPath();diamond(overlayCtx,x,y,elevation(x,y));overlayCtx.fill()}}
     if(previewPlayer&&previewSprite){
       const x=previewPlayer.x/tools.tileSize,y=previewPlayer.y/tools.tileSize,p=project(x,y,elevation(Math.floor(x),Math.floor(y)));
       const scale=window.ClockAttackPreviewScale||1;
@@ -122,6 +125,8 @@
     updateToolUI();status(review?'確認用です。視点を切り替えてマップを確認できます。':'編集用です。「編集」を押してマップを編集できます。');
   }
   $('editingTab').addEventListener('click',()=>setTab(false));$('reviewTab').addEventListener('click',()=>setTab(true));
+  for(const z of [3,2,1,0,-1,-2]){const button=document.createElement('button');button.type='button';button.textContent=z+'階層';button.dataset.height=z;button.className=z===0?'selected':'';button.setAttribute('aria-pressed',String(z===0));button.addEventListener('click',()=>{selectedHeight=z;for(const b of heightButtons){b.classList.toggle('selected',Number(b.dataset.height)===z);b.setAttribute('aria-pressed',String(Number(b.dataset.height)===z))}flashUntil=performance.now()+2000;flashHeight();status(z+'階層に配置します。')});heightButtons.push(button);$('heightTools').append(button)}
+  function flashHeight(){drawOverlay();if(performance.now()<flashUntil)requestAnimationFrame(flashHeight)}
   $('editorGridToggle').addEventListener('click',()=>{showEditorGrid=!showEditorGrid;$('editorGridToggle').textContent='グリッド：'+(showEditorGrid?'ON':'OFF');$('editorGridToggle').setAttribute('aria-pressed',String(showEditorGrid));drawOverlay()});
   function drawPalette(){
     for(let id=0;id<buttons.length;id++){
@@ -163,7 +168,7 @@
     if(topView){const x=Math.floor((px-padding)/tools.tileSize),y=Math.floor((py-padding)/tools.tileSize);return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null}
     const b=bounds(),dx=(px-padding-21+b.left)/half;
     // Check the raised surface first, then the lower water surface.
-    for(const z of [1,0]){
+    for(const z of [4,3,2,1,0,-1]){
       const dy=(py-padding-21+b.top+z*half)/rise;
       const rx=(dy+dx)/2,ry=(dy-dx)/2,a=rotation*Math.PI/180;
       const x=Math.floor(rx*Math.cos(a)+ry*Math.sin(a)+map.width/2),y=Math.floor(-rx*Math.sin(a)+ry*Math.cos(a)+map.height/2);
@@ -199,8 +204,8 @@
     }
     for(const point of MapBrush.cells(cell.x,cell.y,brushLength,brushDirections[brushLength]||0,map.width,map.height,brushShape)){
       const index=point.y*map.width+point.x;
-      if(map.tiles[index]===selected)continue;
-      map.tiles[index]=selected;changed=true;
+      if(map.tiles[index]===selected&&map.heights[index]===selectedHeight)continue;
+      map.tiles[index]=selected;map.heights[index]=selectedHeight;changed=true;
     }
     draw();
     status((brushShape==='square'?brushLength+'×'+brushLength:brushLength)+'マスで編集中');
@@ -296,7 +301,8 @@
     const kept=(map.objects||[]).filter(o=>o.x+(tools.catalog[o.id].width_tiles||1)<=width&&o.y+(tools.catalog[o.id].height_tiles||1)<=height);
     if((width<map.width||height<map.height)&&!confirm('サイズを小さくすると、範囲外の地形とオブジェクトが削除されます。変更しますか？'))return;
     const tiles=Array.from({length:width*height},(_,i)=>{const x=i%width,y=Math.floor(i/width);return x<map.width&&y<map.height?map.tiles[y*map.width+x]:0});
-    map.width=width;map.height=height;map.tiles=tiles;map.objects=kept;
+    const heights=Array.from({length:width*height},(_,i)=>{const x=i%width,y=Math.floor(i/width);return x<map.width&&y<map.height?(map.heights[y*map.width+x]||0):0});
+    map.width=width;map.height=height;map.tiles=tiles;map.heights=heights;map.objects=kept;
     if(previewPlayer&&(previewPlayer.x>=width*tools.tileSize||previewPlayer.y>=height*tools.tileSize))previewPlayer=null;
     syncSize();setZoom(zoomIndex);draw();save();status('サイズを変更して保存しました。追加した部分は先頭の地面チップで埋めています。');
   });
@@ -336,7 +342,7 @@
   $('save').addEventListener('click',save);
   $('clearMap').addEventListener('click',()=>{
     if(!confirm('マップ全体の地形を先頭の地面チップに戻し、配置したオブジェクトをすべて削除します。マップのサイズは変わりません。実行しますか？'))return;
-    map.tiles.fill(0);map.objects=[];previewPlayer=null;placingPlayer=false;
+    map.tiles.fill(0);map.heights.fill(0);map.objects=[];previewPlayer=null;placingPlayer=false;
     updateToolUI();draw();changed=true;save();
     if(!changed)status('マップ全体を消去し、保存しました。ゲームへの反映にはJSONを書き出してください。');
   });
@@ -353,7 +359,7 @@
     try{
       const imported=tools.normalize(JSON.parse(await file.text()));
       if(!imported)throw Error('invalid map');
-      map.width=imported.width;map.height=imported.height;map.tiles=imported.tiles;map.objects=imported.objects;previewPlayer=null;syncSize();setZoom(zoomIndex);
+      map.width=imported.width;map.height=imported.height;map.tiles=imported.tiles;map.heights=imported.heights;map.objects=imported.objects;previewPlayer=null;syncSize();setZoom(zoomIndex);
       draw();save();status('マップを読み込み、保存しました。');
     }catch{status('このマップデータは読み込めません。')}
     event.target.value='';

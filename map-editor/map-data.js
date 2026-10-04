@@ -12,7 +12,7 @@
       const file=x===9||x===10?(y===9||y===10?'bridge.png':'water.png'):(y===9||y===10?'path.png':(x*7+y*11)%9===0?'flowers.png':'grass.png');
       tiles.push(Math.max(0,names.indexOf(file)));
     }
-    return {version:1,width,height,tiles,objects:[],tileset:catalog};
+    return {version:1,width,height,tiles,heights:Array(width*height).fill(0),objects:[],tileset:catalog};
   }
 
   function normalize(value){
@@ -29,7 +29,8 @@
       if(!tile||!Number.isInteger(object.x)||!Number.isInteger(object.y)||object.x<0||object.y<0||object.x+(tile.width_tiles||1)>width||object.y+(tile.height_tiles||1)>height)return null;
       objects.push({id,x:object.x,y:object.y});
     }
-    return {version:1,width,height,tiles:translated,objects,tileset:catalog};
+    if(value.heights!==undefined&&(!Array.isArray(value.heights)||value.heights.length!==width*height||!value.heights.every(z=>Number.isInteger(z)&&z>=-2&&z<=3)))return null;
+    return {version:1,width,height,tiles:translated,heights:value.heights?[...value.heights]:Array(width*height).fill(0),objects,tileset:catalog};
   }
 
   function load(){
