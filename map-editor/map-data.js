@@ -30,7 +30,13 @@
       objects.push({id,x:object.x,y:object.y});
     }
     if(value.heights!==undefined&&(!Array.isArray(value.heights)||value.heights.length!==width*height||!value.heights.every(z=>Number.isInteger(z)&&z>=-2&&z<=3)))return null;
-    return {version:1,width,height,tiles:translated,heights:value.heights?[...value.heights]:Array(width*height).fill(0),objects,tileset:catalog};
+    let layers;
+    if(value.layers!==undefined){
+      if(!Array.isArray(value.layers)||value.layers.length!==width*height)return null;
+      layers=[];
+      for(const column of value.layers){if(!Array.isArray(column))return null;const result=[],seen=new Set();for(const layer of column){if(!layer||!Number.isInteger(layer.z)||layer.z< -2||layer.z>3||seen.has(layer.z)||!Number.isInteger(layer.id)||layer.id<0||layer.id>=sourceNames.length)return null;const id=names.indexOf(sourceNames[layer.id]);if(id<0)return null;seen.add(layer.z);result.push({id,z:layer.z})}layers.push(result.sort((a,b)=>a.z-b.z))}
+    }else layers=translated.map((id,i)=>[{id,z:value.heights?.[i]||0}]);
+    return {version:1,width,height,layers,tiles:translated,heights:value.heights?[...value.heights]:Array(width*height).fill(0),objects,tileset:catalog};
   }
 
   function load(){

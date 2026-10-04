@@ -5,6 +5,9 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
+  map.layers=map.layers||map.tiles.map((id,i)=>[{id,z:map.heights[i]||0}]);
+  function updateColumn(index){const column=map.layers[index].sort((a,b)=>a.z-b.z),top=column[column.length-1];map.tiles[index]=top?.id??0;map.heights[index]=top?.z??0}
+  function terrainCells(){return map.layers.flatMap((column,i)=>column.map(layer=>({x:i%map.width,y:Math.floor(i/map.width),id:layer.id,z:layer.z})))}
   const isPreview=false;
   let topView=false,flatView=false,rotation=0,reviewMode=false;
   const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
@@ -27,7 +30,7 @@
   const levels=[.4,.5,.75,1,1.25,1.5];
   const availableWidth=viewport.clientWidth-16;
   let zoomIndex=availableWidth>=canvas.width?3:availableWidth>=canvas.width*.75?2:availableWidth>=canvas.width*.5?1:0;
-  let selected=0,editing=false,erasingObjects=false,drag=null,changed=false,brushLength=1,brushShape='line';
+  let selected=0,editing=false,erasingTiles=false,erasingObjects=false,drag=null,changed=false,brushLength=1,brushShape='line';
   const brushDirections={3:0,5:0,7:0},brushButtons=[];
   const directionNames=['横','縦','右下がり斜め','右上がり斜め'];
   const isObjectTile=tile=>tile.category==='object'||(tile.width_tiles||1)>1||(tile.height_tiles||1)>1;
@@ -51,27 +54,28 @@
     $('zoomValue').textContent=`${Math.round(zoom*100)}%`;
     drawOverlay();
   }
-  function drawCell(x,y){
-    if(flatView){const p=project(x,y,elevation(x,y)),image=sheet[map.tiles[y*map.width+x]];ctx.fillStyle=elevation(x,y)?'#b78b53':'#258e96';ctx.fillRect(p.x,p.y,42,21);if(image.complete&&image.naturalWidth)ctx.drawImage(image,21,22,21,20,p.x,p.y,42,21);return}
+  function drawCell(x,y,id,z){
+    const height=z+1;
+    if(flatView){const p=project(x,y,height),image=sheet[id];ctx.fillStyle=height?'#b78b53':'#258e96';ctx.fillRect(p.x,p.y,42,21);if(image.complete&&image.naturalWidth)ctx.drawImage(image,21,22,21,20,p.x,p.y,42,21);return}
     if(topView){
-      const image=sheet[map.tiles[y*map.width+x]],left=padding+x*42,top=padding+y*42;
+      const image=sheet[id],left=padding+x*42,top=padding+y*42;
       if(!image.complete||!image.naturalWidth)return;
       // Unproject only the diamond surface into a square; omit the vertical faces.
       ctx.save();ctx.beginPath();ctx.rect(left,top,42,42);ctx.clip();
       ctx.transform(1,-1,2,2,left-21,top+21);ctx.drawImage(image,0,0);ctx.restore();return;
     }
-    const p=project(x,y,elevation(x,y));
-    if(rotation===0){tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],p.x-half,p.y);return}
-    const image=sheet[map.tiles[y*map.width+x]];if(!image.complete||!image.naturalWidth)return;
-    const points=[project(x,y,elevation(x,y)),project(x+1,y,elevation(x,y)),project(x+1,y+1,elevation(x,y)),project(x,y+1,elevation(x,y))];
-    for(let i=0;i<4;i++){const a=points[i],b=points[(i+1)%4];ctx.beginPath();polygon(ctx,[a,b,{x:b.x,y:b.y+21},{x:a.x,y:a.y+21}]);ctx.fillStyle=elevation(x,y)?'#b78b53':'#258e96';ctx.fill()}
+    const p=project(x,y,height);
+    if(rotation===0){tools.drawTile(ctx,sheet,id,p.x-half,p.y);return}
+    const image=sheet[id];if(!image.complete||!image.naturalWidth)return;
+    const points=[project(x,y,height),project(x+1,y,height),project(x+1,y+1,height),project(x,y+1,height)];
+    for(let i=0;i<4;i++){const a=points[i],b=points[(i+1)%4];ctx.beginPath();polygon(ctx,[a,b,{x:b.x,y:b.y+21},{x:a.x,y:a.y+21}]);ctx.fillStyle=height?'#b78b53':'#258e96';ctx.fill()}
     ctx.save();ctx.beginPath();polygon(ctx,points);ctx.clip();ctx.translate(p.x,p.y);const angle=rotation*Math.PI/180,c=Math.cos(angle),sn=Math.sin(angle);ctx.transform(c,sn/2,-sn*2,c,0,0);ctx.drawImage(image,-21,0);ctx.restore();
   }
   function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=false;
-    const cells=map.tiles.map((_,i)=>({x:i%map.width,y:Math.floor(i/map.width)}));
-    cells.sort((a,b)=>{const p=rotate(a.x,a.y),q=rotate(b.x,b.y);return flatView?a.y-b.y:(p.x+p.y)-(q.x+q.y)});
-    for(const cell of cells)drawCell(cell.x,cell.y);
+    const cells=terrainCells();
+    cells.sort((a,b)=>{const p=rotate(a.x,a.y),q=rotate(b.x,b.y);return (flatView?a.y-b.y:(p.x+p.y)-(q.x+q.y))||a.z-b.z});
+    for(const cell of cells)drawCell(cell.x,cell.y,cell.id,cell.z);
     for(const object of [...(map.objects||[])].sort((a,b)=>project(a.x,a.y).y-project(b.x,b.y).y)){
       const image=sheet[object.id];if(!image.complete||!image.naturalWidth)continue;
       const p=project(object.x+.5,object.y+.5,elevation(object.x,object.y));
@@ -89,7 +93,7 @@
     overlay.width=canvas.width;overlay.height=canvas.height;overlay.style.width=canvas.width*zoom+'px';overlay.style.height=canvas.height*zoom+'px';
     if(showEditorGrid){
       overlayCtx.strokeStyle='#10211e88';overlayCtx.lineWidth=1;overlayCtx.beginPath();
-      for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)diamond(overlayCtx,x,y,elevation(x,y));
+      for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)diamond(overlayCtx,x,y,selectedHeight+1);
       overlayCtx.stroke();
     }
     overlayCtx.strokeStyle='#b2d0bc';overlayCtx.lineWidth=2;overlayCtx.beginPath();
@@ -99,7 +103,7 @@
       for(const r of MapCollision.build(map,tools.catalog))polygon(overlayCtx,[project(r.left/42,r.top/42),project(r.right/42,r.top/42),project(r.right/42,r.bottom/42),project(r.left/42,r.bottom/42)]);
       overlayCtx.stroke();
     }
-    if(performance.now()<flashUntil&&Math.floor(performance.now()/250)%2===0){overlayCtx.fillStyle='#ffe36b99';for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)if(map.heights[y*map.width+x]===selectedHeight){overlayCtx.beginPath();diamond(overlayCtx,x,y,elevation(x,y));overlayCtx.fill()}}
+    if(performance.now()<flashUntil&&Math.floor(performance.now()/250)%2===0){overlayCtx.fillStyle='#ffe36b99';for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)if(map.layers[y*map.width+x].some(layer=>layer.z===selectedHeight)){overlayCtx.beginPath();diamond(overlayCtx,x,y,elevation(x,y));overlayCtx.fill()}}
     if(previewPlayer&&previewSprite){
       const x=previewPlayer.x/tools.tileSize,y=previewPlayer.y/tools.tileSize,p=project(x,y,elevation(Math.floor(x),Math.floor(y)));
       const scale=window.ClockAttackPreviewScale||1;
@@ -140,6 +144,7 @@
   }
   function updateToolUI(){
     buttons.forEach((button,index)=>button.classList.toggle('selected',index===selected));
+    $('eraseTiles').classList.toggle('selected',editing&&erasingTiles);$('eraseTiles').setAttribute('aria-pressed',String(editing&&erasingTiles));
     $('pan').classList.toggle('selected',!editing);
     $('pan').setAttribute('aria-pressed',String(!editing));
     $('edit').classList.toggle('selected',editing);
@@ -154,7 +159,7 @@
     canvas.style.touchAction=editing?'none':'pan-y';
   }
   function setTool(id){
-    selected=id;erasingObjects=false;placingPlayer=false;updateToolUI();
+    selected=id;erasingTiles=false;erasingObjects=false;placingPlayer=false;updateToolUI();
     status(`${tools.names[id]}を選択しました。${editing?'マップをタップして塗れます。':'塗るには「編集」を押してください。'}`);
   }
   function save(){
@@ -168,11 +173,11 @@
     if(topView){const x=Math.floor((px-padding)/tools.tileSize),y=Math.floor((py-padding)/tools.tileSize);return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null}
     const b=bounds(),dx=(px-padding-21+b.left)/half;
     // Check the raised surface first, then the lower water surface.
-    for(const z of [4,3,2,1,0,-1]){
+    for(const z of [selectedHeight+1]){
       const dy=(py-padding-21+b.top+z*half)/rise;
       const rx=(dy+dx)/2,ry=(dy-dx)/2,a=rotation*Math.PI/180;
       const x=Math.floor(rx*Math.cos(a)+ry*Math.sin(a)+map.width/2),y=Math.floor(-rx*Math.sin(a)+ry*Math.cos(a)+map.height/2);
-      if(x>=0&&x<map.width&&y>=0&&y<map.height&&elevation(x,y)===z)return {x,y};
+      if(x>=0&&x<map.width&&y>=0&&y<map.height)return {x,y};
     }
     return null;
   }
@@ -213,7 +218,7 @@
   function updateBrushUI(){
     for(const button of brushButtons){
       const length=Number(button.dataset.length),shape=button.dataset.shape,direction=brushDirections[length]||0;
-      const active=editing&&!erasingObjects&&!placingPlayer&&brushLength===length&&brushShape===shape;
+      const active=editing&&!erasingObjects&&!erasingTiles&&!placingPlayer&&brushLength===length&&brushShape===shape;
       const label=shape==='square'?length+'×'+length+'マス':length+'マス'+(length===1?'':'・'+directionNames[direction]);
       button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));
       button.setAttribute('aria-label',label+'で描画');
@@ -228,18 +233,19 @@
     const button=document.createElement('button');button.type='button';button.className='brush-button';button.dataset.length=length;button.dataset.shape=shape;
     button.addEventListener('click',()=>{
       if(editing&&brushLength===length&&brushShape===shape&&shape==='line'&&length>1)brushDirections[length]=(brushDirections[length]+1)%4;
-      brushLength=length;brushShape=shape;editing=true;placingPlayer=false;erasingObjects=false;updateToolUI();
+      brushLength=length;brushShape=shape;erasingTiles=false;editing=true;placingPlayer=false;erasingObjects=false;updateToolUI();
       status((shape==='square'?length+'×'+length:length)+'マスで描画します。クリック位置を中央に塗ります。');
     });
     brushButtons.push(button);$('brushes').append(button);
   }
   const brushHint=document.createElement('p');brushHint.className='brush-hint';brushHint.textContent='同じツールを押して向きを変更';$('brushes').append(brushHint);
   const eraser=document.createElement('button');eraser.type='button';eraser.id='eraseObjects';eraser.className='brush-button';eraser.setAttribute('aria-label','オブジェクト消しゴム');eraser.title='タップしたオブジェクトを削除します。地面は残ります。';eraser.innerHTML='<svg viewBox="0 0 45 45" aria-hidden="true"><path d="M8 27 24 10a4 4 0 0 1 6 0l8 8a4 4 0 0 1 0 6L22 40H13L8 35a6 6 0 0 1 0-8Z" fill="none" stroke="currentColor" stroke-width="3"/><path d="m17 18 14 14M22 40h16" fill="none" stroke="currentColor" stroke-width="3"/></svg><span>オブジェクト消しゴム</span>';
-  eraser.addEventListener('click',()=>{erasingObjects=true;placingPlayer=false;editing=true;updateToolUI();status('消したいオブジェクトをタップしてください。地面のチップは残ります。')});
+  eraser.addEventListener('click',()=>{erasingObjects=true;erasingTiles=false;placingPlayer=false;editing=true;updateToolUI();status('消したいオブジェクトをタップしてください。地面のチップは残ります。')});
   $('brushes').append(eraser);
   const playerTool=document.createElement('button');playerTool.type='button';playerTool.id='placePlayer';playerTool.className='brush-button';playerTool.textContent='プレイヤー配置';
-  playerTool.addEventListener('click',()=>{placingPlayer=!placingPlayer;erasingObjects=false;editing=true;if(!placingPlayer)previewPlayer=null;updateToolUI();drawOverlay();status(placingPlayer?'マップを押して確認用プレイヤーを配置してください。もう一度ボタンを押すと非表示になります。':'確認用プレイヤーを非表示にしました。')});$('brushes').append(playerTool);
+  playerTool.addEventListener('click',()=>{placingPlayer=!placingPlayer;erasingTiles=false;erasingObjects=false;editing=true;if(!placingPlayer)previewPlayer=null;updateToolUI();drawOverlay();status(placingPlayer?'マップを押して確認用プレイヤーを配置してください。もう一度ボタンを押すと非表示になります。':'確認用プレイヤーを非表示にしました。')});$('brushes').append(playerTool);
 
+  const tileEraser=document.createElement('button');tileEraser.id='eraseTiles';tileEraser.type='button';tileEraser.className='brush-button';tileEraser.textContent='チップ消しゴム';tileEraser.setAttribute('aria-pressed','false');tileEraser.addEventListener('click',()=>{erasingTiles=!erasingTiles;erasingObjects=false;placingPlayer=false;editing=true;updateToolUI();status(erasingTiles?selectedHeight+'階層のチップを削除します。':'チップ消しゴムを解除しました。')});$('brushes').append(tileEraser);
   let previousCategory='';
   tools.names.forEach((name,id)=>{
     const tile=tools.catalog[id],category=isObjectTile(tile)?'object':'ground';
@@ -275,8 +281,8 @@
     confirmCanvas.width=iso?(map.width+map.height)*21+pad*2:map.width*42+pad*2;
     confirmCanvas.height=iso?Math.ceil((map.width+map.height)*10.5+42+pad*2):side?84+pad*2:map.height*42+pad*2;
     confirmCanvas.style.width=confirmCanvas.width*confirmZoom+'px';confirmCanvas.style.height=confirmCanvas.height*confirmZoom+'px';confirmCtx.imageSmoothingEnabled=false;
-    const cells=map.tiles.map((id,i)=>({id,x:i%map.width,y:Math.floor(i/map.width)})).sort((a,b)=>iso?a.x+a.y-b.x-b.y:a.y-b.y);
-    for(const {id,x,y} of cells){const p=projectPreview(x,y,elevation(x,y)),im=sheet[id];if(im.complete&&im.naturalWidth){
+    const cells=terrainCells().sort((a,b)=>(iso?a.x+a.y-b.x-b.y:a.y-b.y)||a.z-b.z);
+    for(const {id,x,y,z} of cells){const p=projectPreview(x,y,z+1),im=sheet[id];if(im.complete&&im.naturalWidth){
       if(iso)confirmCtx.drawImage(im,p.x-21,p.y);
       else if(side){confirmCtx.fillStyle=elevation(x,y)?'#b78b53':'#258e96';confirmCtx.fillRect(p.x,p.y,42,21);confirmCtx.drawImage(im,21,22,21,20,p.x,p.y,42,21)}
       else{confirmCtx.save();confirmCtx.beginPath();confirmCtx.rect(p.x,p.y,42,42);confirmCtx.clip();confirmCtx.transform(1,-1,2,2,p.x-21,p.y+21);confirmCtx.drawImage(im,0,0);confirmCtx.restore()}
@@ -302,7 +308,8 @@
     if((width<map.width||height<map.height)&&!confirm('サイズを小さくすると、範囲外の地形とオブジェクトが削除されます。変更しますか？'))return;
     const tiles=Array.from({length:width*height},(_,i)=>{const x=i%width,y=Math.floor(i/width);return x<map.width&&y<map.height?map.tiles[y*map.width+x]:0});
     const heights=Array.from({length:width*height},(_,i)=>{const x=i%width,y=Math.floor(i/width);return x<map.width&&y<map.height?(map.heights[y*map.width+x]||0):0});
-    map.width=width;map.height=height;map.tiles=tiles;map.heights=heights;map.objects=kept;
+    const layers=Array.from({length:width*height},(_,i)=>{const x=i%width,y=Math.floor(i/width);return x<map.width&&y<map.height?map.layers[y*map.width+x]:[{id:0,z:0}]});
+    map.width=width;map.height=height;map.layers=layers;map.tiles=tiles;map.heights=heights;map.objects=kept;
     if(previewPlayer&&(previewPlayer.x>=width*tools.tileSize||previewPlayer.y>=height*tools.tileSize))previewPlayer=null;
     syncSize();setZoom(zoomIndex);draw();save();status('サイズを変更して保存しました。追加した部分は先頭の地面チップで埋めています。');
   });
@@ -342,7 +349,7 @@
   $('save').addEventListener('click',save);
   $('clearMap').addEventListener('click',()=>{
     if(!confirm('マップ全体の地形を先頭の地面チップに戻し、配置したオブジェクトをすべて削除します。マップのサイズは変わりません。実行しますか？'))return;
-    map.tiles.fill(0);map.heights.fill(0);map.objects=[];previewPlayer=null;placingPlayer=false;
+    map.tiles.fill(0);map.heights.fill(0);map.layers=map.tiles.map(()=>[{id:0,z:0}]);map.objects=[];previewPlayer=null;placingPlayer=false;
     updateToolUI();draw();changed=true;save();
     if(!changed)status('マップ全体を消去し、保存しました。ゲームへの反映にはJSONを書き出してください。');
   });
@@ -359,7 +366,7 @@
     try{
       const imported=tools.normalize(JSON.parse(await file.text()));
       if(!imported)throw Error('invalid map');
-      map.width=imported.width;map.height=imported.height;map.tiles=imported.tiles;map.heights=imported.heights;map.objects=imported.objects;previewPlayer=null;syncSize();setZoom(zoomIndex);
+      map.width=imported.width;map.height=imported.height;map.tiles=imported.tiles;map.layers=imported.layers;map.heights=imported.heights;map.objects=imported.objects;previewPlayer=null;syncSize();setZoom(zoomIndex);
       draw();save();status('マップを読み込み、保存しました。');
     }catch{status('このマップデータは読み込めません。')}
     event.target.value='';
