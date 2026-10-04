@@ -27,7 +27,7 @@
   const sheet=tools.tileFiles.map(()=>new Image());
   const buttons=[];
   const levels=[.4,.5,.75,1,1.25,1.5];
-  const availableWidth=innerWidth-32;
+  const availableWidth=viewport.clientWidth-16;
   let zoomIndex=availableWidth>=canvas.width?3:availableWidth>=canvas.width*.75?2:availableWidth>=canvas.width*.5?1:0;
   let selected=0,editing=false,erasingObjects=false,drag=null,changed=false,brushLength=1,brushShape='line';
   const brushDirections={3:0,5:0,7:0},brushButtons=[];
@@ -49,7 +49,7 @@
     canvas.style.width=`${canvas.width*zoom}px`;
     canvas.style.height=`${canvas.height*zoom}px`;
     overlay.style.width=canvas.style.width;overlay.style.height=canvas.style.height;
-    viewport.style.height=`${Math.min(Math.round(innerHeight*.7),Math.round(canvas.height*zoom+16))}px`;
+    viewport.style.height=`${Math.min(Math.round(innerHeight*.64),Math.round(canvas.height*zoom+16))}px`;
     $('zoomValue').textContent=`${Math.round(zoom*100)}%`;
     drawOverlay();
   }
