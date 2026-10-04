@@ -5,13 +5,7 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
-  const isPreview=new URLSearchParams(location.search).has('preview');
-  const previewFrame=isPreview?null:document.createElement('iframe');
-  if(isPreview){document.body.classList.add('preview-page')}
-  else {previewFrame.id='livePreview';previewFrame.title='確認用マップ';previewFrame.src='index.html?preview=1';$('previewMount').append(previewFrame);previewFrame.addEventListener('load',()=>previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.protocol==='file:'||location.origin==='null'?'*':location.origin))}
-
-  function sendPreview(){if(!isPreview&&previewFrame.contentWindow)previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.protocol==='file:'||location.origin==='null'?'*':location.origin)}
-  if(!isPreview)addEventListener('message',event=>{if(event.source===previewFrame.contentWindow&&event.data?.type==='scrap-preview-ready')sendPreview()});
+  const isPreview=false;
   let topView=false,flatView=false,rotation=0,reviewMode=false;
   const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
   function bounds(){const p=[[0,0],[map.width,0],[map.width,map.height],[0,map.height]].map(([x,y])=>rotate(x,y));return {left:Math.min(...p.map(p=>(p.x-p.y)*21)),right:Math.max(...p.map(p=>(p.x-p.y)*21)),top:Math.min(...p.map(p=>(p.x+p.y)*10.5)),bottom:Math.max(...p.map(p=>(p.x+p.y)*10.5))}}
@@ -84,7 +78,7 @@
       else ctx.drawImage(image,p.x-image.naturalWidth/2,p.y-image.naturalHeight+14);
     }
     drawOverlay();
-    if(!isPreview&&previewFrame.contentWindow)previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.origin==='null'?'*':location.origin);
+    drawLivePreview();
   }
   function drawOverlay(){
     const zoom=levels[zoomIndex],layer=canvas.parentElement;
@@ -267,6 +261,28 @@
     });
     $('palette').append(button);buttons.push(button);
   });
+
+  let confirmView='top',confirmZoom=.4,confirmGrid=true;
+  const confirmCanvas=$('confirmCanvas'),confirmCtx=confirmCanvas.getContext('2d');
+  function drawLivePreview(){
+    const size=42,pad=42,iso=confirmView==='quarter',side=confirmView==='side';
+    const projectPreview=(x,y,z=1)=>iso?{x:pad+map.height*21+(x-y)*21,y:pad+21+(x+y)*10.5-z*21}:side?{x:pad+x*42,y:pad+42-z*21}:{x:pad+x*42,y:pad+y*42};
+    confirmCanvas.width=iso?(map.width+map.height)*21+pad*2:map.width*42+pad*2;
+    confirmCanvas.height=iso?Math.ceil((map.width+map.height)*10.5+42+pad*2):side?84+pad*2:map.height*42+pad*2;
+    confirmCanvas.style.width=confirmCanvas.width*confirmZoom+'px';confirmCanvas.style.height=confirmCanvas.height*confirmZoom+'px';confirmCtx.imageSmoothingEnabled=false;
+    const cells=map.tiles.map((id,i)=>({id,x:i%map.width,y:Math.floor(i/map.width)})).sort((a,b)=>iso?a.x+a.y-b.x-b.y:a.y-b.y);
+    for(const {id,x,y} of cells){const p=projectPreview(x,y,elevation(x,y)),im=sheet[id];if(im.complete&&im.naturalWidth){
+      if(iso)confirmCtx.drawImage(im,p.x-21,p.y);
+      else if(side){confirmCtx.fillStyle=elevation(x,y)?'#b78b53':'#258e96';confirmCtx.fillRect(p.x,p.y,42,21);confirmCtx.drawImage(im,21,22,21,20,p.x,p.y,42,21)}
+      else{confirmCtx.save();confirmCtx.beginPath();confirmCtx.rect(p.x,p.y,42,42);confirmCtx.clip();confirmCtx.transform(1,-1,2,2,p.x-21,p.y+21);confirmCtx.drawImage(im,0,0);confirmCtx.restore()}
+    }
+    if(confirmGrid){confirmCtx.strokeStyle='#10211e88';confirmCtx.beginPath();polygon(confirmCtx,[projectPreview(x,y,elevation(x,y)),projectPreview(x+1,y,elevation(x,y)),projectPreview(x+1,y+1,elevation(x,y)),projectPreview(x,y+1,elevation(x,y))]);confirmCtx.stroke()}}
+    for(const o of [...map.objects].sort((a,b)=>a.x+a.y-b.x-b.y)){const im=sheet[o.id];if(!im.complete||!im.naturalWidth)continue;const p=projectPreview(o.x+.5,o.y+.5,elevation(o.x,o.y));if(iso||side)confirmCtx.drawImage(im,p.x-im.naturalWidth/2,p.y-im.naturalHeight+14);else{const scale=Math.min(34/im.naturalWidth,34/im.naturalHeight);confirmCtx.drawImage(im,p.x-im.naturalWidth*scale/2,p.y-im.naturalHeight*scale/2,im.naturalWidth*scale,im.naturalHeight*scale)}}
+    $('confirmSize').textContent='マップ '+map.width+' × '+map.height;$('confirmZoomValue').textContent=Math.round(confirmZoom*100)+'%';
+  }
+  for(const view of ['quarter','top','side'])$('confirm-'+view).addEventListener('click',()=>{confirmView=view;for(const id of ['quarter','top','side'])$('confirm-'+id).classList.toggle('selected',id===view);drawLivePreview()});
+  $('confirmZoomOut').addEventListener('click',()=>{confirmZoom=Math.max(.2,confirmZoom-.1);drawLivePreview()});$('confirmZoomIn').addEventListener('click',()=>{confirmZoom=Math.min(1.5,confirmZoom+.1);drawLivePreview()});$('confirmGrid').addEventListener('click',()=>{confirmGrid=!confirmGrid;$('confirmGrid').textContent='グリッド：'+(confirmGrid?'ON':'OFF');drawLivePreview()});
+
   let loadedTiles=0;
   sheet.forEach((image,index)=>{
     image.onload=()=>{drawPalette();draw();if(++loadedTiles===sheet.length)status('移動中です。塗るには「編集」を押してください。')};
@@ -342,13 +358,4 @@
     }catch{status('このマップデータは読み込めません。')}
     event.target.value='';
   });
-  if(isPreview){
-    setTab(true);setZoom(0);
-    addEventListener('message',event=>{
-      if(event.source!==parent||(location.protocol!=='file:'&&event.origin!==location.origin)||event.data?.type!=='scrap-map-preview')return;
-      const next=tools.normalize(event.data.map);if(!next)return;
-      Object.assign(map,next);syncSize();setZoom(zoomIndex);draw();status('編集内容を反映しました（確認専用）。');
-    });
-    parent.postMessage({type:'scrap-preview-ready'},location.protocol==='file:'||location.origin==='null'?'*':location.origin);
-  }
 })();
