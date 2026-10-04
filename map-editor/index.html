@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#172a28">
-  <title>マップ編集 — 針の刻</title>
+  <title>マップ編集 — Scrap</title>
   <style>
     :root{font-family:system-ui,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:#edf4df;background:#10211e}
     *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:linear-gradient(135deg,#203c31,#10211e 60%)}button,a{font:inherit}button{cursor:pointer}header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:1px solid #b5d3a433;background:#10221fdd}h1{font-size:20px;margin:0;letter-spacing:.06em}.back{padding:10px 14px;border:1px solid #acc8a1;border-radius:10px;color:#f3f5df;text-decoration:none;font-size:14px;font-weight:800}.back:hover{background:#ffffff16}
@@ -17,20 +17,20 @@
   </style>
 </head>
 <body>
-  <header><h1>マップ編集</h1></header>
+  <header><h1>Scrap マップ編集 · v0.2.0</h1></header>
   <div id="brushes" class="brushes" role="toolbar" aria-label="描画ツール"></div>
   <main>
     <section class="board" aria-label="マップ編集盤面">
       <div class="board-bar"><strong>マップ 24 × 18</strong><div class="zoom"><button id="pan" class="small-button pan-button" type="button" aria-pressed="true">移動</button><button id="edit" class="small-button edit-button" type="button" aria-pressed="false">編集</button><button id="zoomOut" class="small-button" type="button" aria-label="縮小">−</button><span id="zoomValue">100%</span><button id="zoomIn" class="small-button" type="button" aria-label="拡大">＋</button></div></div>
       <div class="view-options"><label>マップ 横<input id="mapWidth" type="number" min="4" max="256" value="64">マス</label><label>縦<input id="mapHeight" type="number" min="4" max="256" value="64">マス</label><button id="resizeMap" type="button">サイズ変更</button></div>
-      <div class="view-options"><button id="editorGridToggle" type="button" aria-pressed="true">グリッド：ON</button><button id="editorBoundsToggle" type="button" aria-pressed="true">カメラ表示範囲：ON</button><label>表示画面 幅<input id="battleWidth" type="number" min="240" max="3840" value="390">px</label><label>高さ<input id="battleHeight" type="number" min="320" max="2160" value="844">px</label></div>
+      <div class="view-options"><button id="editorGridToggle" type="button" aria-pressed="true">グリッド：ON</button></div>
       <div id="viewport" class="viewport"><div class="map-layer"><canvas id="map" width="768" height="576" aria-label="マップ"></canvas><canvas id="mapOverlay" width="768" height="576" aria-hidden="true"></canvas></div></div>
       <div class="board-footer"><span id="message" role="status">読み込み中</span></div>
     </section>
     <aside class="tools">
       <h2>マップチップ</h2>
       <div id="palette" class="palette" aria-label="塗るチップを選択"></div>
-      <p class="hint">地面チップは選択して塗り、オブジェクトは選択して配置します。「オブジェクト消しゴム」はタップしたオブジェクトを消し、地面は残します。選択中の3・5・7マスのアイコンを再度押すと向きが変わります。移動中はマップをスクロールできます。「保存」はこのエディター内の保存です。ゲームへの反映は「書き出し」でJSONを出力してください。「プレイヤー配置」で見え方と通行不可の赤枠を確認できます。</p>
+      <p class="hint">地面チップは選択して塗り、オブジェクトは選択して配置します。「オブジェクト消しゴム」はタップしたオブジェクトを消し、地面は残します。選択中の3・5・7マスのアイコンを再度押すと向きが変わります。移動中はマップをスクロールできます。「保存」はこのエディター内の保存です。「書き出し」でJSONを保存できます。ゲームへの読み込み連動は準備中です。「プレイヤー配置」で見え方と通行不可の赤枠を確認できます。</p>
       <div class="actions">
         <button id="save" class="tool-button" type="button">保存</button>
         <button id="export" class="tool-button" type="button">書き出し</button>
@@ -42,10 +42,10 @@
   </main>
   <script src="tile-catalog.js?master=1"></script>
   <script src="map-data.js?size=2"></script>
-  <script src="movement-bounds.js"></script>
   <script src="map-collision.js"></script>
   <script src="player-preview.js"></script>
   <script src="brush.js?objects=1"></script>
   <script src="editor.js?clear-map=1"></script>
 </body>
 </html>
+

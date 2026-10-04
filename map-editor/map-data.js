@@ -1,6 +1,6 @@
 (()=>{
   'use strict';
-  const width=64,height=64,tileSize=32,storageKey='clock-attack-map-editor-v1';
+  const width=20,height=20,tileSize=42,storageKey='scrap-map-editor-42-v1';
   const catalog=window.ClockAttackTileCatalog||[];
   if(!catalog.length)throw Error('open-editor.cmdでチップ一覧を更新してください');
   const tileFiles=catalog.map(tile=>tile.image);
@@ -9,9 +9,8 @@
   function defaultMap(){
     const tiles=[];
     for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-      const pathY=Math.round(height/2+Math.sin(x*.38)*2);
-      const random=((x*73856093)^(y*19349663)^(x*y*83492791))>>>0;
-      tiles.push(x>1&&x<width-2&&Math.abs(y-pathY)<=1?3:random%100<9?1:random%100<18?2:0);
+      const file=x===9||x===10?(y===9||y===10?'bridge.png':'water.png'):(y===9||y===10?'path.png':(x*7+y*11)%9===0?'flowers.png':'grass.png');
+      tiles.push(Math.max(0,names.indexOf(file)));
     }
     return {version:1,width,height,tiles,objects:[],tileset:catalog};
   }

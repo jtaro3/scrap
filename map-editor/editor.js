@@ -5,7 +5,7 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
-  function syncSize(){canvas.width=map.width*32;canvas.height=map.height*32;document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
+  function syncSize(){canvas.width=map.width*tools.tileSize;canvas.height=map.height*tools.tileSize;document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
   syncSize();
   const sheet=tools.tileFiles.map(()=>new Image());
   const buttons=[];
@@ -19,15 +19,11 @@
   let placingPlayer=false,previewPlayer=null,previewSprite=null;
   const previewImage=new Image();
   previewImage.onload=()=>{
-    const sprite=document.createElement('canvas');sprite.width=513;sprite.height=629;
-    const context=sprite.getContext('2d',{willReadFrequently:true});context.drawImage(previewImage,370,334,513,629,0,0,513,629);
-    const pixels=context.getImageData(0,0,513,629);
-    for(let i=0;i<pixels.data.length;i+=4)if(Math.max(pixels.data[i],pixels.data[i+1],pixels.data[i+2])<=2)pixels.data[i+3]=0;
-    context.putImageData(pixels,0,0);previewSprite=sprite;drawOverlay();
+    previewSprite=previewImage;drawOverlay();
   };
   previewImage.src=window.ClockAttackPlayerPreview;
 
-  let showEditorGrid=true,showEditorBounds=true;
+  let showEditorGrid=true;
   const overlay=$('mapOverlay'),overlayCtx=overlay.getContext('2d');
   function status(text){message.textContent=text}
   function setZoom(index){
@@ -51,39 +47,24 @@
     for(let y=0;y<map.height;y++)for(let x=0;x<map.width;x++)drawCell(x,y);
     for(const object of map.objects||[]){
       const tile=tools.catalog[object.id],image=sheet[object.id];
-      if(image.complete&&image.naturalWidth)ctx.drawImage(image,object.x*32,object.y*32,(tile.width_tiles||1)*32,(tile.height_tiles||1)*32);
+      if(image.complete&&image.naturalWidth)ctx.drawImage(image,object.x*tools.tileSize,object.y*tools.tileSize,(tile.width_tiles||1)*tools.tileSize,(tile.height_tiles||1)*tools.tileSize);
     }
     drawOverlay();
   }
   function drawOverlay(){
-    const cssWidth=Number($('battleWidth').value),cssHeight=Number($('battleHeight').value);
-    const valid=Number.isFinite(cssWidth)&&Number.isFinite(cssHeight)&&cssWidth>=240&&cssWidth<=3840&&cssHeight>=320&&cssHeight<=2160;
-    const w=cssWidth/BattleMapBounds.viewScale,h=cssHeight/BattleMapBounds.viewScale;
-    const center=previewPlayer||{x:canvas.width/2,y:canvas.height/2};
-    const camera={left:center.x-w/2,top:center.y-h/2,width:w,height:h};
-    const mapX=showEditorBounds&&valid?Math.ceil(Math.max(0,-camera.left)):0;
-    const mapY=showEditorBounds&&valid?Math.ceil(Math.max(0,-camera.top)):0;
-    const stageW=showEditorBounds&&valid?Math.ceil(mapX+Math.max(canvas.width,camera.left+w)):canvas.width;
-    const stageH=showEditorBounds&&valid?Math.ceil(mapY+Math.max(canvas.height,camera.top+h)):canvas.height;
+    const mapX=0,mapY=0,stageW=canvas.width,stageH=canvas.height;
     const zoom=levels[zoomIndex];
     const layer=canvas.parentElement;layer.style.width=stageW*zoom+'px';layer.style.height=stageH*zoom+'px';
     canvas.style.position='absolute';canvas.style.left=mapX*zoom+'px';canvas.style.top=mapY*zoom+'px';
     overlay.width=stageW;overlay.height=stageH;overlay.style.width=stageW*zoom+'px';overlay.style.height=stageH*zoom+'px';
     if(showEditorGrid){
       overlayCtx.strokeStyle='#10211e88';overlayCtx.lineWidth=1;overlayCtx.beginPath();
-      for(let x=0;x<=map.width;x++){overlayCtx.moveTo(mapX+x*32+.5,mapY);overlayCtx.lineTo(mapX+x*32+.5,mapY+canvas.height)}
-      for(let y=0;y<=map.height;y++){overlayCtx.moveTo(mapX,mapY+y*32+.5);overlayCtx.lineTo(mapX+canvas.width,mapY+y*32+.5)}
+      for(let x=0;x<=map.width;x++){overlayCtx.moveTo(mapX+x*tools.tileSize+.5,mapY);overlayCtx.lineTo(mapX+x*tools.tileSize+.5,mapY+canvas.height)}
+      for(let y=0;y<=map.height;y++){overlayCtx.moveTo(mapX,mapY+y*tools.tileSize+.5);overlayCtx.lineTo(mapX+canvas.width,mapY+y*tools.tileSize+.5)}
       overlayCtx.stroke();
     }
     overlayCtx.strokeStyle='#b2d0bc';overlayCtx.lineWidth=2;
     overlayCtx.strokeRect(mapX+1,mapY+1,canvas.width-2,canvas.height-2);
-    if(showEditorBounds&&valid){
-      const x=mapX+camera.left,y=mapY+camera.top,width=camera.width,height=camera.height;
-      overlayCtx.strokeStyle='#10211e';overlayCtx.lineWidth=5;overlayCtx.strokeRect(x,y,width,height);
-      overlayCtx.strokeStyle='#fff2b6';overlayCtx.lineWidth=2;overlayCtx.strokeRect(x,y,width,height);
-      overlayCtx.fillStyle='#10211ecc';overlayCtx.fillRect(x+5,y+5,240,24);
-      overlayCtx.fillStyle='#fff2b6';overlayCtx.font='12px system-ui';overlayCtx.fillText('カメラ表示範囲 '+cssWidth+'×'+cssHeight,x+10,y+22);
-    }
     if(placingPlayer||previewPlayer){
       overlayCtx.strokeStyle='#ff7070';overlayCtx.lineWidth=2;
       for(const rect of MapCollision.build(map,tools.catalog))overlayCtx.strokeRect(mapX+rect.left,mapY+rect.top,rect.right-rect.left,rect.bottom-rect.top);
@@ -94,8 +75,6 @@
     }
   }
   $('editorGridToggle').addEventListener('click',()=>{showEditorGrid=!showEditorGrid;$('editorGridToggle').textContent='グリッド：'+(showEditorGrid?'ON':'OFF');$('editorGridToggle').setAttribute('aria-pressed',String(showEditorGrid));drawOverlay()});
-  $('editorBoundsToggle').addEventListener('click',()=>{showEditorBounds=!showEditorBounds;$('editorBoundsToggle').textContent='カメラ表示範囲：'+(showEditorBounds?'ON':'OFF');$('editorBoundsToggle').setAttribute('aria-pressed',String(showEditorBounds));drawOverlay()});
-  for(const id of ['battleWidth','battleHeight'])$(id).addEventListener('input',drawOverlay);
   function drawPalette(){
     for(let id=0;id<buttons.length;id++){
       const preview=buttons[id].querySelector('canvas');
@@ -138,7 +117,7 @@
   function paint(event){
     const cell=cellAt(event);if(!cell)return;
     if(placingPlayer){
-      previewPlayer={x:cell.x*32+16,y:cell.y*32+16};drawOverlay();
+      previewPlayer={x:cell.x*tools.tileSize+tools.tileSize/2,y:cell.y*tools.tileSize+tools.tileSize/2};drawOverlay();
       const blocked=MapCollision.blocked(previewPlayer.x,previewPlayer.y+14,10,MapCollision.build(map,tools.catalog));
       status(blocked?'プレイヤーを配置しました。足元が通行不可の範囲に重なっています。':'確認用プレイヤーを配置しました。別のマスを押すと置き直せます。');return;
     }
@@ -237,7 +216,7 @@
     if((width<map.width||height<map.height)&&!confirm('サイズを小さくすると、範囲外の地形とオブジェクトが削除されます。変更しますか？'))return;
     const tiles=Array.from({length:width*height},(_,i)=>{const x=i%width,y=Math.floor(i/width);return x<map.width&&y<map.height?map.tiles[y*map.width+x]:0});
     map.width=width;map.height=height;map.tiles=tiles;map.objects=kept;
-    if(previewPlayer&&(previewPlayer.x>=width*32||previewPlayer.y>=height*32))previewPlayer=null;
+    if(previewPlayer&&(previewPlayer.x>=width*tools.tileSize||previewPlayer.y>=height*tools.tileSize))previewPlayer=null;
     syncSize();setZoom(zoomIndex);draw();save();status('サイズを変更して保存しました。追加した部分は先頭の地面チップで埋めています。');
   });
   setZoom(zoomIndex);
@@ -283,9 +262,9 @@
   $('export').addEventListener('click',()=>{
     const data=new Blob([JSON.stringify(map,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(data),link=document.createElement('a');
-    link.href=url;link.download='clock-attack-grassland.json';link.click();
+    link.href=url;link.download='scrap-map.json';link.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
-    status('JSONを書き出しました。ゲーム側のmapsフォルダへ同名で置き換えてください。');
+    status('JSONを書き出しました。Scrapゲームへの読み込み連動は準備中です。');
   });
   $('import').addEventListener('click',()=>$('file').click());
   $('file').addEventListener('change',async event=>{

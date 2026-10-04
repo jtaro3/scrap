@@ -5,8 +5,8 @@
     function add(id,x,y){
       const tile=catalog[id];
       if(!tile||tile.walkable!==false)return;
-      const width=Number(tile.collision_width)*32,height=Number(tile.collision_length)*32;
-      if(width>0&&height>0)rects.push({left:x*32,top:y*32,right:x*32+width,bottom:y*32+height});
+      const width=Number(tile.collision_width)*42,height=Number(tile.collision_length)*42;
+      if(width>0&&height>0)rects.push({left:x*42,top:y*42,right:x*42+width,bottom:y*42+height});
     }
     map.tiles.forEach((id,index)=>add(id,index%map.width,Math.floor(index/map.width)));
     (map.objects||[]).forEach(o=>add(o.id,o.x,o.y));

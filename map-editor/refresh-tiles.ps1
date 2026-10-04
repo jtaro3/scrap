@@ -21,12 +21,12 @@ try {
     }
     if ($tileFiles.Count + $objectFiles.Count -eq 0) { throw 'No PNG tiles or objects found in maps/tiles or maps/object.' }
     $orderedFiles = [Collections.Generic.List[object]]::new()
-    foreach ($legacyName in @('grass.png','grass-dark.png','flowers.png','soil.png')) {
+    foreach ($legacyName in @('grass.png','flowers.png','path.png','water.png','bridge.png')) {
         $match = $tileFiles | Where-Object Name -eq $legacyName
         if ($match) { $orderedFiles.Add($match) }
     }
     foreach ($pngFile in $tileFiles) {
-        if ($pngFile.Name -notin @('grass.png','grass-dark.png','flowers.png','soil.png')) { $orderedFiles.Add($pngFile) }
+        if ($pngFile.Name -notin @('grass.png','flowers.png','path.png','water.png','bridge.png')) { $orderedFiles.Add($pngFile) }
     }
     foreach ($pngFile in $objectFiles) { $orderedFiles.Add($pngFile) }
     $duplicateNames = @($orderedFiles | Group-Object Name | Where-Object Count -gt 1)
@@ -37,10 +37,10 @@ try {
         if ($pngBytes.Length -lt 24 -or [BitConverter]::ToString($pngBytes,0,8) -ne '89-50-4E-47-0D-0A-1A-0A') { throw ('Invalid PNG: '+$pngFile.Name) }
         $width = [Net.IPAddress]::NetworkToHostOrder([BitConverter]::ToInt32($pngBytes,16))
         $height = [Net.IPAddress]::NetworkToHostOrder([BitConverter]::ToInt32($pngBytes,20))
-        if ($width -lt 32 -or $height -lt 32 -or $width % 32 -ne 0 -or $height % 32 -ne 0) { throw ('PNG size must be a multiple of 32: '+$pngFile.Name+' ('+$width+'x'+$height+')') }
+        if ($width -lt 42 -or $height -lt 42 -or $width % 42 -ne 0 -or $height % 42 -ne 0) { Write-Warning ('Skipped non-42px asset: '+$pngFile.Name); continue }
         $category = if ($pngFile.DirectoryName -eq $objectFolder) { 'object' } else { 'ground' }
         $setting = $paletteSettings[$pngFile.Name]
-        $catalog += [ordered]@{ file=$pngFile.Name; category=$category; palette_category=if($setting){[string]$setting.category}else{''}; palette_color=if($setting){[string]$setting.palette_color}else{''}; walkable=if($setting -and $null -ne $setting.walkable){[bool]$setting.walkable}else{$true}; collision_length=if($setting){[double]$setting.collision_length}else{0}; collision_width=if($setting){[double]$setting.collision_width}else{0}; width_tiles=($width/32); height_tiles=($height/32); image=('data:image/png;base64,'+[Convert]::ToBase64String($pngBytes)) }
+        $catalog += [ordered]@{ file=$pngFile.Name; category=$category; palette_category=if($setting){[string]$setting.category}else{''}; palette_color=if($setting){[string]$setting.palette_color}else{''}; walkable=if($setting -and $null -ne $setting.walkable){[bool]$setting.walkable}else{$true}; collision_length=if($setting){[double]$setting.collision_length}else{0}; collision_width=if($setting){[double]$setting.collision_width}else{0}; width_tiles=($width/42); height_tiles=($height/42); image=('data:image/png;base64,'+[Convert]::ToBase64String($pngBytes)) }
     }
     $json = ConvertTo-Json -InputObject $catalog -Depth 4 -Compress
     [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'tile-catalog.js'),('window.ClockAttackTileCatalog='+$json+';window.ClockAttackPreviewScale='+$previewScale.ToString([Globalization.CultureInfo]::InvariantCulture)+';'),[Text.UTF8Encoding]::new($false))
@@ -52,3 +52,4 @@ try {
     Write-Host ('ERROR: '+$_.Exception.Message) -ForegroundColor Red
     exit 1
 }
+
