@@ -5,6 +5,11 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
+  const isPreview=new URLSearchParams(location.search).has('preview');
+  const previewFrame=isPreview?null:document.createElement('iframe');
+  if(isPreview){document.body.classList.add('preview-page')}
+  else {previewFrame.id='livePreview';previewFrame.title='確認用マップ';previewFrame.src='index.html?preview=1';$('previewMount').append(previewFrame);previewFrame.addEventListener('load',()=>previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.origin==='null'?'*':location.origin))}
+
   let topView=false,flatView=false,rotation=0,reviewMode=false;
   const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
   function bounds(){const p=[[0,0],[map.width,0],[map.width,map.height],[0,map.height]].map(([x,y])=>rotate(x,y));return {left:Math.min(...p.map(p=>(p.x-p.y)*21)),right:Math.max(...p.map(p=>(p.x-p.y)*21)),top:Math.min(...p.map(p=>(p.x+p.y)*10.5)),bottom:Math.max(...p.map(p=>(p.x+p.y)*10.5))}}
@@ -77,6 +82,7 @@
       else ctx.drawImage(image,p.x-image.naturalWidth/2,p.y-image.naturalHeight+14);
     }
     drawOverlay();
+    if(!isPreview&&previewFrame.contentWindow)previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.origin==='null'?'*':location.origin);
   }
   function drawOverlay(){
     const zoom=levels[zoomIndex],layer=canvas.parentElement;
@@ -334,4 +340,12 @@
     }catch{status('このマップデータは読み込めません。')}
     event.target.value='';
   });
+  if(isPreview){
+    setTab(true);setZoom(0);
+    addEventListener('message',event=>{
+      if(event.source!==parent||event.origin!==location.origin||event.data?.type!=='scrap-map-preview')return;
+      const next=tools.normalize(event.data.map);if(!next)return;
+      Object.assign(map,next);syncSize();setZoom(zoomIndex);draw();status('編集内容を反映しました（確認専用）。');
+    });
+  }
 })();
