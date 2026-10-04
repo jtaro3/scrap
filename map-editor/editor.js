@@ -8,8 +8,10 @@
   const isPreview=new URLSearchParams(location.search).has('preview');
   const previewFrame=isPreview?null:document.createElement('iframe');
   if(isPreview){document.body.classList.add('preview-page')}
-  else {previewFrame.id='livePreview';previewFrame.title='確認用マップ';previewFrame.src='index.html?preview=1';$('previewMount').append(previewFrame);previewFrame.addEventListener('load',()=>previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.origin==='null'?'*':location.origin))}
+  else {previewFrame.id='livePreview';previewFrame.title='確認用マップ';previewFrame.src='index.html?preview=1';$('previewMount').append(previewFrame);previewFrame.addEventListener('load',()=>previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.protocol==='file:'||location.origin==='null'?'*':location.origin))}
 
+  function sendPreview(){if(!isPreview&&previewFrame.contentWindow)previewFrame.contentWindow.postMessage({type:'scrap-map-preview',map},location.protocol==='file:'||location.origin==='null'?'*':location.origin)}
+  if(!isPreview)addEventListener('message',event=>{if(event.source===previewFrame.contentWindow&&event.data?.type==='scrap-preview-ready')sendPreview()});
   let topView=false,flatView=false,rotation=0,reviewMode=false;
   const rotate=(x,y)=>{const a=rotation*Math.PI/180,c=Math.cos(a),s=Math.sin(a);x-=map.width/2;y-=map.height/2;return {x:x*c-y*s,y:x*s+y*c}};
   function bounds(){const p=[[0,0],[map.width,0],[map.width,map.height],[0,map.height]].map(([x,y])=>rotate(x,y));return {left:Math.min(...p.map(p=>(p.x-p.y)*21)),right:Math.max(...p.map(p=>(p.x-p.y)*21)),top:Math.min(...p.map(p=>(p.x+p.y)*10.5)),bottom:Math.max(...p.map(p=>(p.x+p.y)*10.5))}}
@@ -343,9 +345,10 @@
   if(isPreview){
     setTab(true);setZoom(0);
     addEventListener('message',event=>{
-      if(event.source!==parent||event.origin!==location.origin||event.data?.type!=='scrap-map-preview')return;
+      if(event.source!==parent||(location.protocol!=='file:'&&event.origin!==location.origin)||event.data?.type!=='scrap-map-preview')return;
       const next=tools.normalize(event.data.map);if(!next)return;
       Object.assign(map,next);syncSize();setZoom(zoomIndex);draw();status('編集内容を反映しました（確認専用）。');
     });
+    parent.postMessage({type:'scrap-preview-ready'},location.protocol==='file:'||location.origin==='null'?'*':location.origin);
   }
 })();
