@@ -5,13 +5,13 @@
   const canvas=$('map'),ctx=canvas.getContext('2d');
   const viewport=$('viewport'),message=$('message');
   const map=tools.load();
-  let topView=false;
+  let topView=false,flatView=false;
   const half=tools.tileSize/2, rise=tools.tileSize/4, padding=84;
   const elevation=(x,y)=>tools.names[map.tiles[y*map.width+x]]==='water.png'?0:1;
-  function project(x,y,z=1){if(topView)return {x:padding+x*tools.tileSize,y:padding+y*tools.tileSize};return {x:padding+map.height*half+(x-y)*half,y:padding+half+(x+y)*rise-z*half}}
+  function project(x,y,z=1){if(topView||flatView)return {x:padding+x*tools.tileSize,y:padding+y*tools.tileSize};return {x:padding+map.height*half+(x-y)*half,y:padding+half+(x+y)*rise-z*half}}
   function polygon(context,points){context.moveTo(points[0].x,points[0].y);for(const p of points.slice(1))context.lineTo(p.x,p.y);context.closePath()}
   function diamond(context,x,y,z=1){polygon(context,[project(x,y,z),project(x+1,y,z),project(x+1,y+1,z),project(x,y+1,z)])}
-  function syncSize(){canvas.width=(topView?map.width*tools.tileSize:(map.width+map.height)*half)+padding*2;canvas.height=topView?map.height*tools.tileSize+padding*2:Math.ceil((map.width+map.height)*rise+half+padding*2);document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
+  function syncSize(){canvas.width=((topView||flatView)?map.width*tools.tileSize:(map.width+map.height)*half)+padding*2;canvas.height=(topView||flatView)?map.height*tools.tileSize+padding*2:Math.ceil((map.width+map.height)*rise+half+padding*2);document.querySelector(".board-bar strong").textContent=`マップ ${map.width} × ${map.height}`;$("mapWidth").value=map.width;$("mapHeight").value=map.height;}
   syncSize();
   const sheet=tools.tileFiles.map(()=>new Image());
   const buttons=[];
@@ -43,6 +43,7 @@
     drawOverlay();
   }
   function drawCell(x,y){
+    if(flatView){tools.drawTile(ctx,sheet,map.tiles[y*map.width+x],padding+x*42,padding+y*42);return}
     if(topView){
       const image=sheet[map.tiles[y*map.width+x]],left=padding+x*42,top=padding+y*42;
       if(!image.complete||!image.naturalWidth)return;
@@ -60,7 +61,7 @@
       const image=sheet[object.id];if(!image.complete||!image.naturalWidth)continue;
       const p=project(object.x+.5,object.y+.5,elevation(object.x,object.y));
       // Sprite bases sit 14px above their lower edge; tall images grow upward.
-      if(topView){const size=34,scale=Math.min(size/image.naturalWidth,size/image.naturalHeight);ctx.drawImage(image,p.x-image.naturalWidth*scale/2,p.y-image.naturalHeight*scale/2,image.naturalWidth*scale,image.naturalHeight*scale)}
+      if(topView||flatView){const size=34,scale=Math.min(size/image.naturalWidth,size/image.naturalHeight);ctx.drawImage(image,p.x-image.naturalWidth*scale/2,p.y-image.naturalHeight*scale/2,image.naturalWidth*scale,image.naturalHeight*scale)}
       else ctx.drawImage(image,p.x-image.naturalWidth/2,p.y-image.naturalHeight+14);
     }
     drawOverlay();
@@ -85,14 +86,15 @@
     if(previewPlayer&&previewSprite){
       const x=previewPlayer.x/tools.tileSize,y=previewPlayer.y/tools.tileSize,p=project(x,y,elevation(Math.floor(x),Math.floor(y)));
       const scale=window.ClockAttackPreviewScale||1;
-      overlayCtx.imageSmoothingEnabled=false;overlayCtx.drawImage(previewSprite,p.x-21*scale,p.y-(topView?31.5:49)*scale,42*scale,63*scale);
+      overlayCtx.imageSmoothingEnabled=false;overlayCtx.drawImage(previewSprite,p.x-21*scale,p.y-((topView||flatView)?31.5:49)*scale,42*scale,63*scale);
     }
   }
-  $('viewToggle').addEventListener('click',()=>{
-    topView=!topView;drag=null;
-    $('viewToggle').textContent='視点：'+(topView?'真上':'クォータービュー');$('viewToggle').setAttribute('aria-pressed',String(topView));
+  const viewModes=[['quarterView','クォータービュー'],['topView','真上'],['flatView','平面']];
+  for(const [id,label] of viewModes)$(id).addEventListener('click',()=>{
+    topView=id==='topView';flatView=id==='flatView';drag=null;
+    for(const [buttonId] of viewModes){$(buttonId).setAttribute('aria-pressed',String(buttonId===id));$(buttonId).classList.toggle('selected',buttonId===id)}
     syncSize();setZoom(zoomIndex);draw();viewport.scrollLeft=0;viewport.scrollTop=0;
-    status((topView?'真上':'クォータービュー')+'に切り替えました。同じマップを編集できます。');
+    status(label+'に切り替えました。'+(flatView?'42×42pxのチップ画像全体を表示しています。':'同じマップを編集できます。'));
   });
   $('editorGridToggle').addEventListener('click',()=>{showEditorGrid=!showEditorGrid;$('editorGridToggle').textContent='グリッド：'+(showEditorGrid?'ON':'OFF');$('editorGridToggle').setAttribute('aria-pressed',String(showEditorGrid));drawOverlay()});
   function drawPalette(){
@@ -131,7 +133,7 @@
   function cellAt(event){
     const rect=canvas.getBoundingClientRect();
     const px=(event.clientX-rect.left)*canvas.width/rect.width,py=(event.clientY-rect.top)*canvas.height/rect.height;
-    if(topView){const x=Math.floor((px-padding)/tools.tileSize),y=Math.floor((py-padding)/tools.tileSize);return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null}
+    if(topView||flatView){const x=Math.floor((px-padding)/tools.tileSize),y=Math.floor((py-padding)/tools.tileSize);return x>=0&&x<map.width&&y>=0&&y<map.height?{x,y}:null}
     const dx=(px-padding-map.height*half)/half;
     // Check the raised surface first, then the lower water surface.
     for(const z of [1,0]){
